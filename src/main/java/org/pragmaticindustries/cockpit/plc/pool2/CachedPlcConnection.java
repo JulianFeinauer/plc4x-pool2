@@ -21,7 +21,7 @@ import java.util.function.BiFunction;
  * @author julian
  * Created by julian on 24.02.20
  */
-public class CachedPlcConnection implements PlcConnection {
+public class CachedPlcConnection implements PlcConnection, PlcConnectionMetadata {
 
     private static final Logger logger = LoggerFactory.getLogger(CachedPlcConnection.class);
 
@@ -103,7 +103,11 @@ public class CachedPlcConnection implements PlcConnection {
 
     @Override
     public PlcConnectionMetadata getMetadata() {
-        throw new UnsupportedOperationException();
+        if (closed) {
+            throw new IllegalStateException("Trying to get Metadata on a closed Connection!");
+        } else {
+            return this;
+        }
     }
 
     @Override
@@ -132,5 +136,32 @@ public class CachedPlcConnection implements PlcConnection {
     @Override
     public PlcUnsubscriptionRequest.Builder unsubscriptionRequestBuilder() {
         throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public boolean canRead() {
+        if (closed) {
+            return false;
+        } else {
+            return this.activeConnection.getMetadata().canRead();
+        }
+    }
+
+    @Override
+    public boolean canWrite() {
+        if (closed) {
+            return false;
+        } else {
+            return this.activeConnection.getMetadata().canWrite();
+        }
+    }
+
+    @Override
+    public boolean canSubscribe() {
+        if (closed) {
+            return false;
+        } else {
+            return this.activeConnection.getMetadata().canSubscribe();
+        }
     }
 }
