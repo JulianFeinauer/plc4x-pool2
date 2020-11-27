@@ -1,6 +1,6 @@
 package org.pragmaticindustries.cockpit.plc.pool2;
 
-import org.apache.plc4x.java.api.PlcConnection;
+import org.apache.plc4x.java.api.exceptions.PlcException;
 import org.apache.plc4x.java.mock.PlcMockConnection;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -9,9 +9,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Supplier;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -24,12 +23,12 @@ import static org.mockito.Mockito.when;
 class CachedDriverManagerIT {
 
     @Test
-    void connectWithMultpleThreads() throws InterruptedException {
+    void connectWithMultpleThreads() throws InterruptedException, PlcException {
         ExecutorService executorService = Executors.newFixedThreadPool(4);
 
-        Supplier<PlcConnection> mock = (Supplier<PlcConnection>) Mockito.mock(Supplier.class);
+        PlcConnectionFactory mock = Mockito.mock(PlcConnectionFactory.class);
         PlcMockConnection plcMockConnection = mock(PlcMockConnection.class);
-        when(mock.get()).thenReturn(plcMockConnection);
+        when(mock.create()).thenReturn(plcMockConnection);
 
         CachedDriverManager driverManager = new CachedDriverManager("", mock, 2_000);
 

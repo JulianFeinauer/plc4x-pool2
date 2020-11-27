@@ -2,6 +2,7 @@ package org.pragmaticindustries.cockpit.plc.pool2;
 
 import org.apache.plc4x.java.api.PlcConnection;
 import org.apache.plc4x.java.api.exceptions.PlcConnectionException;
+import org.apache.plc4x.java.api.exceptions.PlcException;
 import org.apache.plc4x.java.api.messages.PlcReadRequest;
 import org.apache.plc4x.java.mock.PlcMockConnection;
 import org.assertj.core.api.WithAssertions;
@@ -13,7 +14,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -26,26 +26,26 @@ import static org.mockito.Mockito.*;
 class CachedDriverManagerTest implements WithAssertions {
 
     @Test
-    void noConnectionWithoutRequest() throws PlcConnectionException {
-        Supplier mock = Mockito.mock(Supplier.class);
+    void noConnectionWithoutRequest() throws PlcException {
+        PlcConnectionFactory mock = Mockito.mock(PlcConnectionFactory.class);
         CachedDriverManager driverManager = new CachedDriverManager("", mock);
 
-        verify(mock, never()).get();
+        verify(mock, never()).create();
     }
 
     @Test
     void establishConnectionAtFirstRequest() throws Exception {
-        Supplier mock = Mockito.mock(Supplier.class);
+        PlcConnectionFactory mock = Mockito.mock(PlcConnectionFactory.class);
         CachedDriverManager driverManager = new CachedDriverManager("", mock);
 
         driverManager.getConnection("").close();
 
-        verify(mock, timeout(1_000).times(1)).get();
+        verify(mock, timeout(1_000).times(1)).create();
     }
 
     @Test
     void returnConnectionWhenIsActive() throws Exception {
-        Supplier<PlcConnection> mock = (Supplier<PlcConnection>)Mockito.mock(Supplier.class);
+        PlcConnectionFactory mock = Mockito.mock(PlcConnectionFactory.class);
         CachedDriverManager driverManager = new CachedDriverManager("", mock);
 
         driverManager.getConnection("").close();
@@ -60,7 +60,7 @@ class CachedDriverManagerTest implements WithAssertions {
 
     @Test
     void freeConnectionAfterReturn() throws Exception {
-        Supplier<PlcConnection> mock = (Supplier<PlcConnection>)Mockito.mock(Supplier.class);
+        PlcConnectionFactory mock = Mockito.mock(PlcConnectionFactory.class);
         CachedDriverManager driverManager = new CachedDriverManager("", mock);
 
         // Get Connmection
@@ -73,7 +73,7 @@ class CachedDriverManagerTest implements WithAssertions {
 
     @Test
     void useClosedConnection() throws Exception {
-        Supplier<PlcConnection> mock = (Supplier<PlcConnection>)Mockito.mock(Supplier.class);
+        PlcConnectionFactory mock = Mockito.mock(PlcConnectionFactory.class);
         CachedDriverManager driverManager = new CachedDriverManager("", mock);
 
         // Get Connmection
@@ -85,9 +85,9 @@ class CachedDriverManagerTest implements WithAssertions {
 
     @Test
     void useClosedConnection2() throws Exception {
-        Supplier<PlcConnection> mock = (Supplier<PlcConnection>)Mockito.mock(Supplier.class);
+        PlcConnectionFactory mock = Mockito.mock(PlcConnectionFactory.class);
         PlcMockConnection plcMockConnection = mock(PlcMockConnection.class);
-        when(mock.get()).thenReturn(plcMockConnection);
+        when(mock.create()).thenReturn(plcMockConnection);
         when(plcMockConnection.readRequestBuilder()).thenReturn(Mockito.mock(PlcReadRequest.Builder.class));
 
         CachedDriverManager driverManager = new CachedDriverManager("", mock);
@@ -102,10 +102,10 @@ class CachedDriverManagerTest implements WithAssertions {
     }
 
     @Test
-    void multipleRequests_allbutfirstFail() throws PlcConnectionException {
-        Supplier<PlcConnection> mock = (Supplier<PlcConnection>)Mockito.mock(Supplier.class);
+    void multipleRequests_allbutfirstFail() throws PlcException {
+        PlcConnectionFactory mock = Mockito.mock(PlcConnectionFactory.class);
         PlcMockConnection plcMockConnection = mock(PlcMockConnection.class);
-        when(mock.get()).thenReturn(plcMockConnection);
+        when(mock.create()).thenReturn(plcMockConnection);
         when(plcMockConnection.readRequestBuilder()).thenReturn(Mockito.mock(PlcReadRequest.Builder.class));
 
         CachedDriverManager driverManager = new CachedDriverManager("", mock);
@@ -119,9 +119,9 @@ class CachedDriverManagerTest implements WithAssertions {
 
     @Test
     void initialRequests_doesNotFail_dueToQueue() throws PlcConnectionException {
-        Supplier<PlcConnection> mock = (Supplier<PlcConnection>)Mockito.mock(Supplier.class);
+        PlcConnectionFactory mock = Mockito.mock(PlcConnectionFactory.class);
         PlcMockConnection plcMockConnection = mock(PlcMockConnection.class);
-        when(mock.get()).thenReturn(plcMockConnection);
+        when(mock.create()).thenReturn(plcMockConnection);
 
         CachedDriverManager driverManager = new CachedDriverManager("", mock, 3_000);
 
@@ -133,9 +133,9 @@ class CachedDriverManagerTest implements WithAssertions {
     @Test
     @Disabled
     void twoRequests_firstTakesLong_secondsTimesOut() throws PlcConnectionException, InterruptedException, ExecutionException, TimeoutException {
-        Supplier<PlcConnection> mock = (Supplier<PlcConnection>)Mockito.mock(Supplier.class);
+        PlcConnectionFactory mock = Mockito.mock(PlcConnectionFactory.class);
         PlcMockConnection plcMockConnection = mock(PlcMockConnection.class);
-        when(mock.get()).thenReturn(plcMockConnection);
+        when(mock.create()).thenReturn(plcMockConnection);
         when(plcMockConnection.readRequestBuilder()).thenReturn(Mockito.mock(PlcReadRequest.Builder.class));
 
         CachedDriverManager driverManager = new CachedDriverManager("", mock, 5_000);
@@ -163,9 +163,9 @@ class CachedDriverManagerTest implements WithAssertions {
     @Test
     @Disabled
     void twoRequests_firstIsFast_secondWorksAlso() throws Exception {
-        Supplier<PlcConnection> mock = (Supplier<PlcConnection>)Mockito.mock(Supplier.class);
+        PlcConnectionFactory mock = Mockito.mock(PlcConnectionFactory.class);
         PlcMockConnection plcMockConnection = mock(PlcMockConnection.class);
-        when(mock.get()).thenReturn(plcMockConnection);
+        when(mock.create()).thenReturn(plcMockConnection);
         when(plcMockConnection.readRequestBuilder()).thenReturn(Mockito.mock(PlcReadRequest.Builder.class));
 
         CachedDriverManager driverManager = new CachedDriverManager("", mock, 5_000);
@@ -195,9 +195,9 @@ class CachedDriverManagerTest implements WithAssertions {
 
     @Test
     void killBorrowedConnectionWhenRunningLong() throws PlcConnectionException, InterruptedException {
-        Supplier<PlcConnection> mock = (Supplier<PlcConnection>)Mockito.mock(Supplier.class);
+        PlcConnectionFactory mock = Mockito.mock(PlcConnectionFactory.class);
         PlcMockConnection plcMockConnection = mock(PlcMockConnection.class);
-        when(mock.get()).thenReturn(plcMockConnection);
+        when(mock.create()).thenReturn(plcMockConnection);
         when(plcMockConnection.readRequestBuilder()).thenReturn(Mockito.mock(PlcReadRequest.Builder.class));
 
         CachedDriverManager driverManager = new CachedDriverManager("", mock);

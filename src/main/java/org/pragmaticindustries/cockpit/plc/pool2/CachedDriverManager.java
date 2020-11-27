@@ -15,7 +15,6 @@ import java.util.Queue;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Supplier;
 
 /**
  * Driver Manager who Caches ONE Single Connection.
@@ -47,7 +46,7 @@ public class CachedDriverManager extends PlcDriverManager implements CachedDrive
     // End of JMX
 
     private final String url;
-    private final Supplier<PlcConnection> connectionFactory;
+    private final PlcConnectionFactory connectionFactory;
 
     // Add Queue for Requests
     private final Queue<CompletableFuture<PlcConnection>> queue = new LinkedList<>();
@@ -60,7 +59,7 @@ public class CachedDriverManager extends PlcDriverManager implements CachedDrive
     private CachedPlcConnection borrowedConnection;
     private ScheduledFuture<?> borrowWatchdog;
 
-    public CachedDriverManager(String url, Supplier<PlcConnection> connectionFactory) {
+    public CachedDriverManager(String url, PlcConnectionFactory connectionFactory) {
         this(url, connectionFactory, 1000);
     }
     /**
@@ -68,7 +67,7 @@ public class CachedDriverManager extends PlcDriverManager implements CachedDrive
      * @param connectionFactory Factory to create a suitable connection.
      * @param timeoutMillis Time out in milliseonds
      */
-    public CachedDriverManager(String url, Supplier<PlcConnection> connectionFactory, int timeoutMillis) {
+    public CachedDriverManager(String url, PlcConnectionFactory connectionFactory, int timeoutMillis) {
         logger.info("Creating new cached Connection for url {} with timeout {} ms", url, timeoutMillis);
         this.url = url;
         this.connectionFactory = connectionFactory;
@@ -192,7 +191,7 @@ public class CachedDriverManager extends PlcDriverManager implements CachedDrive
                 CompletableFuture.runAsync(() -> {
                     logger.debug("Starting to establish Connection");
                     try {
-                        PlcConnection connection = this.connectionFactory.get();
+                        PlcConnection connection = this.connectionFactory.create();
                         logger.debug("Connection successfully established");
                         synchronized (this) {
                             this.activeConnection = connection;
