@@ -26,7 +26,7 @@ public class CachedPlcConnection implements PlcConnection, PlcConnectionMetadata
     private static final Logger logger = LoggerFactory.getLogger(CachedPlcConnection.class);
 
     private final CachedDriverManager parent;
-    private final PlcConnection activeConnection;
+    private volatile PlcConnection activeConnection;
     private volatile boolean closed = false;
 
     public CachedPlcConnection(CachedDriverManager parent, PlcConnection activeConnection) {
@@ -84,6 +84,8 @@ public class CachedPlcConnection implements PlcConnection, PlcConnectionMetadata
         this.closed = true;
         // Return the Connection as invalid
         parent.handleBrokenConnection();
+        // Invalidate Connection
+        this.activeConnection = null;
         // Throw Exception
         throw new PlcRuntimeException("Unable to finish Request!", e);
     }
@@ -99,6 +101,8 @@ public class CachedPlcConnection implements PlcConnection, PlcConnectionMetadata
         this.closed = true;
         // Return the Connection
         parent.returnConnection(activeConnection);
+        // Invalidate Connection
+        this.activeConnection = null;
     }
 
     @Override
