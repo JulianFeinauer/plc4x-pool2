@@ -55,4 +55,33 @@ class CachedPlcConnectionTest {
         verify(driverManager).handleBrokenConnection();
     }
 
+    @Test
+    void whenReadFutureTimesOut_handleGracefully() throws ExecutionException, InterruptedException, TimeoutException {
+        final CachedDriverManager driverManager = Mockito.mock(CachedDriverManager.class);
+        final PlcConnection mockConnection = Mockito.mock(PlcConnection.class, Mockito.RETURNS_DEEP_STUBS);
+
+        when(mockConnection.readRequestBuilder().build().execute()).thenAnswer(new Answer<Object>() {
+            @Override
+            public Object answer(InvocationOnMock invocation) throws Throwable {
+                final CompletableFuture<? extends PlcReadResponse> future = new CompletableFuture<>();
+                // Return a Future that will never end!
+                return future;
+            }
+        });
+
+        final CachedPlcConnection connection = new CachedPlcConnection(driverManager, mockConnection);
+
+        try {
+            connection.readRequestBuilder()
+                .addItem("a", "b")
+                .build()
+                .execute()
+                .get(10, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            // Do nothing...
+        }
+
+        verify(driverManager).handleBrokenConnection();
+    }
+
 }

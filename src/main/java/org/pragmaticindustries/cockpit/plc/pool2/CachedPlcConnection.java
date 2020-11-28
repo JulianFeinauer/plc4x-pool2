@@ -13,6 +13,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.function.BiFunction;
 
 /**
@@ -24,6 +28,9 @@ import java.util.function.BiFunction;
 public class CachedPlcConnection implements PlcConnection, PlcConnectionMetadata {
 
     private static final Logger logger = LoggerFactory.getLogger(CachedPlcConnection.class);
+
+    private static final ScheduledExecutorService schedulerExecutor =
+        Executors.newScheduledThreadPool(10);
 
     private final CachedDriverManager parent;
     private volatile PlcConnection activeConnection;
@@ -49,6 +56,34 @@ public class CachedPlcConnection implements PlcConnection, PlcConnectionMetadata
         }
     }
 
+    private CompletableFuture<? extends PlcReadResponse> wrapWithTimeout(CompletableFuture<? extends PlcReadResponse> future, long timeoutMillis) {
+        //schedule watcher
+        final CompletableFuture<PlcReadResponse> responseFuture = new CompletableFuture<>();
+        schedulerExecutor.schedule(() -> {
+            if (!future.isDone()) {
+                logger.debug("Timing out the PLC request!");
+                future.cancel(true);
+                responseFuture.completeExceptionally(new TimeoutException("Response did not finish in Time!"));
+            } else {
+                logger.trace("Unnecessary to cancel the request!");
+            }
+        }, timeoutMillis, TimeUnit.MILLISECONDS);
+        future.handle(new BiFunction<PlcReadResponse, Throwable, Object>() {
+            @Override
+            public Object apply(PlcReadResponse plcReadResponse, Throwable throwable) {
+                if (plcReadResponse != null) {
+                    logger.debug("Request finsihed successfull!");
+                    responseFuture.complete(plcReadResponse);
+                } else {
+                    logger.debug("Request failed", throwable);
+                    responseFuture.completeExceptionally(throwable);
+                }
+                return null;
+            }
+        });
+        return responseFuture;
+    }
+
     /**
      * Executes the Request.
      */
@@ -59,11 +94,12 @@ public class CachedPlcConnection implements PlcConnection, PlcConnectionMetadata
         }
         try {
             logger.trace("Executing Request {}", request);
-            final CompletableFuture<? extends PlcReadResponse> responseFuture = request.execute();
+             final CompletableFuture<? extends PlcReadResponse> responseFuture = wrapWithTimeout(request.execute(), 5_000);
+//            final CompletableFuture<? extends PlcReadResponse> responseFuture = request.execute();
             // The following code handles the case, that a read fails (which is handled async and thus not really connected
             // to the connection, yet
             // Thus, we register our own listener who gets the notification and reports the connection as broken
-            return responseFuture.handleAsync(new BiFunction<PlcReadResponse, Throwable, PlcReadResponse>() {
+            final CompletableFuture<PlcReadResponse> handledResponseFuture = responseFuture.handleAsync(new BiFunction<PlcReadResponse, Throwable, PlcReadResponse>() {
                 @Override
                 public PlcReadResponse apply(PlcReadResponse plcReadResponse, Throwable throwable) {
                     if (throwable != null) {
@@ -74,6 +110,7 @@ public class CachedPlcConnection implements PlcConnection, PlcConnectionMetadata
                     return plcReadResponse;
                 }
             });
+            return handledResponseFuture;
         } catch (Exception e) {
             return closeConnectionExceptionally(e);
         }
